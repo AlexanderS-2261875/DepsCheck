@@ -5,10 +5,32 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
+export interface PackageEntry {
+  watched: boolean;
+  latest: string | null;
+  deprecated: string | null;
+  lastCheckedRegistry: string | null;
+  aiSummary: string | null;
+  suggestedAction: string | null;
+  researchedAt: string | null;
+  needsResearch: boolean;
+  seenInProjects: string[];
+}
+
+export interface ProjectEntry {
+  lastSeenDeps: string[];
+  lastCheckedAt: string;
+}
+
+export interface State {
+  packages: Record<string, PackageEntry>;
+  projects: Record<string, ProjectEntry>;
+}
+
 export const STATE_DIR = path.join(os.homedir(), '.claude', 'depscheck');
 export const STATE_FILE = path.join(STATE_DIR, 'state.json');
 
-export function loadState() {
+export function loadState(): State {
   if (!existsSync(STATE_FILE)) {
     return { packages: {}, projects: {} };
   }
@@ -20,7 +42,7 @@ export function loadState() {
   }
 }
 
-export function saveState(state) {
+export function saveState(state: State): void {
   mkdirSync(STATE_DIR, { recursive: true });
   writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
 }

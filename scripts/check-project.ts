@@ -6,11 +6,11 @@
 // from there — no network call, no AI call. Run via the /dcheck slash command.
 import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { loadState, saveState } from './lib/state.mjs';
-import { extractMajor } from './lib/registry.mjs';
-import { syncProjectDeps } from './lib/project.mjs';
+import { loadState, saveState } from './lib/state.ts';
+import { extractMajor } from './lib/registry.ts';
+import { syncProjectDeps } from './lib/project.ts';
 
-function findPackageJson(startDir) {
+function findPackageJson(startDir: string): string | null {
   let dir = path.resolve(startDir);
   for (let i = 0; i < 6; i++) {
     const candidate = path.join(dir, 'package.json');
@@ -30,7 +30,7 @@ if (!pkgPath) {
 }
 
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
-const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+const deps: Record<string, string> = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
 
 const state = loadState();
 const { removed, newlyAdded } = await syncProjectDeps(state, pkgPath, deps);

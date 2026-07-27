@@ -11,14 +11,14 @@
 // needs-research queue so the caller can decide whether to bother invoking
 // Claude at all tonight.
 import { existsSync, readFileSync } from 'node:fs';
-import { loadState, saveState } from './lib/state.mjs';
-import { fetchRegistryInfo, mapWithConcurrency } from './lib/registry.mjs';
-import { syncProjectDeps, pruneMissingProject } from './lib/project.mjs';
+import { loadState, saveState } from './lib/state.ts';
+import { fetchRegistryInfo, mapWithConcurrency } from './lib/registry.ts';
+import { syncProjectDeps, pruneMissingProject } from './lib/project.ts';
 
 const state = loadState();
 
 const projectPaths = Object.keys(state.projects);
-const prunedProjects = [];
+const prunedProjects: string[] = [];
 for (const pkgPath of projectPaths) {
   if (!existsSync(pkgPath)) {
     prunedProjects.push(pkgPath);
@@ -31,7 +31,7 @@ for (const pkgPath of projectPaths) {
   } catch {
     continue;
   }
-  const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+  const deps: Record<string, string> = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
   await syncProjectDeps(state, pkgPath, deps);
 }
 
@@ -43,7 +43,7 @@ await mapWithConcurrency(names, 8, async (name) => {
   if (!registry) return;
 
   const changed = registry.latest !== entry.latest || registry.deprecated !== entry.deprecated;
-  entry.latest = registry.latest;
+  entry.latest = registry.latest ?? null;
   entry.deprecated = registry.deprecated;
   entry.lastCheckedRegistry = new Date().toISOString();
 

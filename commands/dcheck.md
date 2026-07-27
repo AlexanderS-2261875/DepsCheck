@@ -7,7 +7,7 @@ DepsCheck lives at `__DEPSCHECK_HOME__`
 
 1. Run:
    ```
-   node "__DEPSCHECK_HOME__/scripts/check-project.mjs" "$(pwd)"
+   node "__DEPSCHECK_HOME__/scripts/check-project.ts" "$(pwd)"
    ```
    This finds the nearest `package.json` from the current directory upward,
    diffs its dependencies against the local cache

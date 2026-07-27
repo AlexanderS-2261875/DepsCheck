@@ -4,11 +4,11 @@
 // via its own Write tool) never has to worry about shell-quoting a summary
 // that might contain quotes, newlines, etc.
 import { readFileSync } from 'node:fs';
-import { loadState, saveState } from './lib/state.mjs';
+import { loadState, saveState } from './lib/state.ts';
 
 const file = process.argv[2];
 if (!file) {
-  console.error('Usage: set-research.mjs <jsonFile>');
+  console.error('Usage: set-research.ts <jsonFile>');
   console.error('jsonFile shape: {"name": "...", "summary": "...", "suggestedAction": "..."}');
   process.exit(1);
 }

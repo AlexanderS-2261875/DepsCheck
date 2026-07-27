@@ -2,9 +2,19 @@
 // project actually declares right now, so packages that get removed or
 // replaced in a project eventually drop off the nightly watchlist instead
 // of lingering forever.
-import { fetchRegistryInfo } from './registry.mjs';
+import { fetchRegistryInfo } from './registry.ts';
+import type { State } from './state.ts';
 
-export async function syncProjectDeps(state, pkgPath, deps) {
+export interface SyncResult {
+  removed: string[];
+  newlyAdded: number;
+}
+
+export async function syncProjectDeps(
+  state: State,
+  pkgPath: string,
+  deps: Record<string, string>,
+): Promise<SyncResult> {
   const currentNames = Object.keys(deps);
   const prevEntry = state.projects[pkgPath];
   const prevNames = prevEntry?.lastSeenDeps ?? [];
@@ -53,7 +63,7 @@ export async function syncProjectDeps(state, pkgPath, deps) {
 
 // Drops a project that no longer exists on disk and detaches it from every
 // package it used to reference, pruning any package left with no referrers.
-export function pruneMissingProject(state, pkgPath) {
+export function pruneMissingProject(state: State, pkgPath: string): void {
   delete state.projects[pkgPath];
   for (const entry of Object.values(state.packages)) {
     if (entry.seenInProjects?.includes(pkgPath)) {

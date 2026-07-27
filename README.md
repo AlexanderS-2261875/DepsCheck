@@ -136,7 +136,7 @@ feeling instant for anything you've checked before.
 
 ```mermaid
 flowchart TD
-    Start(["launchd fires nightly.sh"]) --> Refresh["refresh-registry.mjs"]
+    Start(["launchd fires nightly.sh"]) --> Refresh["refresh-registry.ts"]
     Refresh --> ReDiff["Re-diff every known project<br/>still on disk"]
     ReDiff --> Prune{"Dependency removed,<br/>or project gone?"}
     Prune -- yes --> Detach["Detach from that<br/>package's seenInProjects"]
@@ -154,7 +154,7 @@ flowchart TD
     Any -- yes --> Done1(["Done — nothing to research tonight"])
     Any -- no --> ClaudeRun["claude -p --dangerously-skip-permissions"]
     ClaudeRun --> Research["WebSearch each queued package,<br/>write findings to a temp file"]
-    Research --> Store["set-research.mjs merges<br/>findings into the cache"]
+    Research --> Store["set-research.ts merges<br/>findings into the cache"]
     Store --> Done2(["Done"])
 ```
 
@@ -237,7 +237,12 @@ A real (trimmed) entry looks like this:
 
 ## Installation
 
-Requires Node 18+ (native `fetch`) and the [Claude Code CLI](https://github.com/anthropics/claude-code) on your `PATH`.
+Requires a Node with native TypeScript support — stable without flags from
+v23.6, available behind `--experimental-strip-types` from v22.6 (tested on
+v26) — plus the [Claude Code CLI](https://github.com/anthropics/claude-code)
+on your `PATH`. The scripts are plain `.ts` files with no build step: run
+them directly (`node scripts/check-project.ts ...`), no `tsc`/`ts-node`
+involved.
 
 ```bash
 git clone <this-repo> DepsCheck
@@ -282,9 +287,9 @@ Everything else is scriptable directly, if you want to drive it outside of
 Claude Code:
 
 ```bash
-node scripts/check-project.mjs /path/to/some/project   # what /dcheck runs
-node scripts/refresh-registry.mjs                        # nightly step 1
-node scripts/list-needs-research.mjs                      # what's queued
+node scripts/check-project.ts /path/to/some/project   # what /dcheck runs
+node scripts/refresh-registry.ts                        # nightly step 1
+node scripts/list-needs-research.ts                      # what's queued
 ```
 
 ## Configuration
@@ -294,8 +299,8 @@ There isn't much yet, deliberately:
 | What | Where |
 |---|---|
 | Nightly run time | `Hour`/`Minute` in the launchd plist |
-| Cache location | `scripts/lib/state.mjs` (`STATE_DIR`) — defaults to `~/.claude/depscheck/` |
-| What counts as "flagged" | `scripts/lib/registry.mjs` (`extractMajor`) + the flag check in `check-project.mjs` — currently: deprecated, or ≥1 major behind |
+| Cache location | `scripts/lib/state.ts` (`STATE_DIR`) — defaults to `~/.claude/depscheck/` |
+| What counts as "flagged" | `scripts/lib/registry.ts` (`extractMajor`) + the flag check in `check-project.ts` — currently: deprecated, or ≥1 major behind |
 | Research prompt | `prompts/nightly-refresh.md` — edit this to change what Claude is asked to look for |
 
 ## Design decisions worth knowing about
@@ -348,7 +353,7 @@ There isn't much yet, deliberately:
 ## Contributing
 
 Issues and PRs welcome. If you're proposing a behavior change to the
-pruning/watchlist logic in `scripts/lib/project.mjs`, please include a
+pruning/watchlist logic in `scripts/lib/project.ts`, please include a
 before/after trace of `state.json` for the scenario you're fixing — that
 logic is small but easy to get subtly wrong, and a concrete example is much
 faster to review than a description.

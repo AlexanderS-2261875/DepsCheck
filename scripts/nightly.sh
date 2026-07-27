@@ -13,7 +13,7 @@ LOG_FILE="$LOG_DIR/nightly.log"
 
 {
   echo "=== $(date) ==="
-  RESULT="$(node scripts/refresh-registry.mjs)"
+  RESULT="$(node scripts/refresh-registry.ts)"
   echo "$RESULT"
   COUNT="$(node -e "console.log(JSON.parse(process.argv[1]).needsResearch.length)" "$RESULT")"
   if [ "$COUNT" -gt 0 ]; then
