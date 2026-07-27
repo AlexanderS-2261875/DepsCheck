@@ -1,0 +1,22 @@
+{
+  "name": "depscheck",
+  "version": "0.1.0",
+  "description": "A local, offline-first dependency-health checker for npm projects — flags deprecated/outdated deps and has an LLM research fixes in the background.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AlexanderS-2261875/DepsCheck.git"
+  },
+  "engines": {
+    "node": ">=23.6.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bash test/smoke-test.sh && bash test/prune-test.sh"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "typescript": "^7.0.2"
+  }
+}

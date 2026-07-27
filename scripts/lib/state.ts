@@ -27,7 +27,8 @@ export interface State {
   projects: Record<string, ProjectEntry>;
 }
 
-export const STATE_DIR = path.join(os.homedir(), '.claude', 'depscheck');
+// Overridable so tests (and CI) never touch the real cache.
+export const STATE_DIR = process.env.DEPSCHECK_STATE_DIR ?? path.join(os.homedir(), '.claude', 'depscheck');
 export const STATE_FILE = path.join(STATE_DIR, 'state.json');
 
 export function loadState(): State {

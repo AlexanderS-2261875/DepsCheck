@@ -1,5 +1,7 @@
 # DepsCheck
 
+[![CI](https://github.com/AlexanderS-2261875/DepsCheck/actions/workflows/ci.yml/badge.svg)](https://github.com/AlexanderS-2261875/DepsCheck/actions/workflows/ci.yml)
+
 A local, offline-first dependency-health checker for npm projects. Point it
 at any project and it tells you what's deprecated, what's aging, and — once
 it's had a chance to look — what to actually do about it. No dashboard, no
@@ -33,6 +35,7 @@ Up to date: 16 packages
   - [The cache, concretely](#the-cache-concretely)
 - [Installation](#installation)
 - [Usage](#usage)
+- [Testing](#testing)
 - [Configuration](#configuration)
 - [Design decisions worth knowing about](#design-decisions-worth-knowing-about)
 - [Limitations](#limitations)
@@ -242,7 +245,9 @@ v23.6, available behind `--experimental-strip-types` from v22.6 (tested on
 v26) — plus the [Claude Code CLI](https://github.com/anthropics/claude-code)
 on your `PATH`. The scripts are plain `.ts` files with no build step: run
 them directly (`node scripts/check-project.ts ...`), no `tsc`/`ts-node`
-involved.
+involved at runtime. `npm install` is only needed for the `devDependencies`
+(TypeScript + `@types/node`) that back `npm run typecheck` — the tool itself
+has zero runtime dependencies.
 
 ```bash
 git clone <this-repo> DepsCheck
@@ -291,6 +296,33 @@ node scripts/check-project.ts /path/to/some/project   # what /dcheck runs
 node scripts/refresh-registry.ts                        # nightly step 1
 node scripts/list-needs-research.ts                      # what's queued
 ```
+
+## Testing
+
+```bash
+npm install        # pulls in TypeScript + @types/node, dev-only
+npm run typecheck   # tsc --noEmit, strict mode
+npm test             # runs both smoke tests below
+```
+
+Two scripts under `test/`, both against a real fixture project
+(`test/fixtures/sample-project`, which genuinely depends on `request` — a
+real, actually-deprecated package on npm — and `lodash`, which isn't), both
+using `DEPSCHECK_STATE_DIR` to point at a throwaway temp directory so a test
+run can never touch your real cache:
+
+- **`smoke-test.sh`** — runs `check-project.ts` against the fixture and
+  asserts `request` comes back flagged (with a real deprecation message from
+  the registry) and `lodash` doesn't.
+- **`prune-test.sh`** — the pruning mechanism's actual contract, codified:
+  check a fixture with two deps, remove one from its `package.json`, run
+  `refresh-registry.ts`, assert the removed package flipped to
+  `watched: false` with an empty `seenInProjects`. This is the same scenario
+  that was manually verified during development (delete a dependency from a
+  real project, confirm the nightly job notices) — as a repeatable check
+  instead of a one-off.
+
+Both run in CI on every push and PR, alongside a strict-mode `tsc --noEmit`.
 
 ## Configuration
 
@@ -352,12 +384,13 @@ There isn't much yet, deliberately:
 
 ## Contributing
 
-Issues and PRs welcome. If you're proposing a behavior change to the
-pruning/watchlist logic in `scripts/lib/project.ts`, please include a
-before/after trace of `state.json` for the scenario you're fixing — that
-logic is small but easy to get subtly wrong, and a concrete example is much
-faster to review than a description.
+Issues and PRs welcome. Run `npm run typecheck && npm test` before opening a
+PR — CI runs the same two commands. If you're proposing a behavior change to
+the pruning/watchlist logic in `scripts/lib/project.ts`, please include a
+before/after trace of `state.json` for the scenario you're fixing (or extend
+`test/prune-test.sh`) — that logic is small but easy to get subtly wrong,
+and a concrete example is much faster to review than a description.
 
 ## License
 
-MIT
+[MIT](LICENSE)

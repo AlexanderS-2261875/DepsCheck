@@ -1,0 +1,9 @@
+{
+  "name": "sample-project",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "request": "^2.88.2",
+    "lodash": "^4.17.21"
+  }
+}
