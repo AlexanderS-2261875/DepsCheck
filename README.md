@@ -1,60 +1,77 @@
 # DepsCheck
 
-Scans Schmitt Software's client projects for outdated/deprecated npm
-dependencies, then has an AI agent research fixes and alternatives.
+A local, cache-backed dependency-health checker for any npm project. Not
+tied to Schmitt Software's clients specifically — works on whatever
+`package.json` is nearest to your current directory.
 
-Two ways to run it:
+## How it works
 
-- **Locally, on demand** — the `/dcheck` slash command in Claude Code (see
-  `~/.claude/commands/dcheck.md`). Scans `../../clients` directly on disk,
-  no cloning needed. Reports go to `reports/` but nothing is committed or
-  pushed without asking first.
-- **Automatically, every morning** — `.github/workflows/daily-deps-check.yml`
-  runs on a cron schedule once this repo is pushed to GitHub. Since GitHub
-  Actions runners can't see your local `../clients` folder, this mode clones
-  every repo in the `schmittsoftware` org instead (see `scripts/clone-clients.sh`).
+There's a shared local cache at `~/.claude/depscheck/state.json`, keyed by
+package name (not per-project — the same `react` entry is shared across
+every project that uses it).
 
-## How the scan works
+- **`/dcheck`** (Claude Code slash command, see `~/.claude/commands/dcheck.md`)
+  — run it from inside any project. It finds the nearest `package.json`,
+  diffs its dependencies against the cache, and reports:
+  - packages already known to be deprecated/outdated, with cached AI research
+    if available
+  - packages flagged but not yet researched (queued for tonight)
+  - brand new packages never seen before get a one-off registry check (fast,
+    no AI) and get added to the watchlist
+  This is read-only and does no AI/web calls itself in the common case —
+  it's just reading the cache. That's what makes it feel instant/offline.
 
-`scripts/scan-deps.mjs <rootDir>` walks every `package.json` under `rootDir`
-(skipping `node_modules`, `dist`, etc.), and for each dependency queries the
-public npm registry to check:
+- **Nightly job** (`scripts/nightly.sh`, run via a local launchd job — see
+  below) does the actual work every morning:
+  1. `scripts/refresh-registry.mjs` — cheap, no AI: re-checks every watched
+     package's latest version and deprecation status.
+  2. Only if something is newly flagged and unresearched, spins up
+     `claude -p` headless with WebSearch to figure out: is it really
+     deprecated/abandoned, what's the maintained replacement, is upgrading a
+     drop-in bump or does it have breaking changes.
+  3. Findings get written back into the cache via `scripts/set-research.mjs`.
 
-- is the latest published version marked `deprecated`?
-- how many majors behind latest is the declared range? (a regex-based
-  heuristic, not full semver — treat `majorsBehind` as a signal, not gospel)
+So the watchlist grows organically as you `/dcheck` different projects over
+time, and every project you've ever checked gets its dependencies re-verified
+every night, whether you open that project again or not.
 
-Anything flagged gets written to a JSON report. `prompts/research.md` is the
-prompt handed to Claude (interactively via `/dcheck`, or headless via
-`claude -p` in CI) to turn that JSON into an actual markdown report with
-researched recommendations.
+## Files
 
-## One-time setup for the automated (GitHub Actions) mode
+- `scripts/check-project.mjs` — the `/dcheck` engine.
+- `scripts/refresh-registry.mjs` — nightly step 1 (registry refresh).
+- `scripts/list-needs-research.mjs` — nightly step 2 helper (what to research).
+- `scripts/set-research.mjs` — safely merges one package's research into the cache.
+- `scripts/nightly.sh` — orchestrates the above, entry point for launchd.
+- `prompts/nightly-refresh.md` — the brief handed to headless Claude.
+- `launchd/com.schmittsoftware.depscheck.plist` — the scheduled job definition.
 
-This repo needs to actually live on GitHub for the cron schedule to fire —
-nothing runs while it only exists on your Mac. Once pushed:
+## One-time setup: enabling the nightly job
 
-1. **Add two repo secrets** (Settings → Secrets and variables → Actions):
-   - `ANTHROPIC_API_KEY` — used to run Claude Code headless in the
-     "Research fixes with Claude" step. I can't set this for you — API keys
-     are a credential and setting them isn't something I'll do automatically.
-   - `CROSS_REPO_PAT` — a GitHub Personal Access Token (classic, `repo`
-     scope, or fine-grained with read access to all client repos) used to
-     clone the private client repos. The default `GITHUB_TOKEN` Actions
-     provides is scoped only to this repo, so it can't see sibling repos in
-     the org even though they're the same owner.
-2. Confirm `config/exclude.txt` still matches which repos in the org are
-   *not* client sites (Schmitt Software's own tooling repos, this repo
-   itself, etc.) — it's a flat list of repo names, one per line.
-3. Trigger a manual run first (Actions tab → "Daily Dependency Check" →
-   "Run workflow") to confirm the whole chain works before trusting the
-   cron schedule.
+The plist isn't loaded yet — nothing runs automatically until you do this:
 
-## Known caveats (unverified — check on first real run)
+```bash
+launchctl load ~/Library/LaunchAgents/com.schmittsoftware.depscheck.plist
+```
 
-- Whether Claude Code's `WebSearch` tool works the same way under a plain
-  `ANTHROPIC_API_KEY` in headless/CI mode as it does in an interactive
-  session hasn't been confirmed here — worth checking the first Actions run.
-- `--dangerously-skip-permissions` is required in CI since there's no
-  terminal to approve tool calls interactively; it's safe here because the
-  runner is an ephemeral, disposable VM.
+(first copy the plist there: `cp launchd/com.schmittsoftware.depscheck.plist ~/Library/LaunchAgents/`)
+
+It's set to run daily at 07:00 local time. To change that, edit the `Hour`/
+`Minute` values in the plist before loading it (or `launchctl unload` +
+edit + `launchctl load` again to change it later).
+
+To test it without waiting for 7am:
+
+```bash
+bash scripts/nightly.sh
+tail -f ~/.claude/depscheck/nightly.log
+```
+
+Only runs while your Mac is on; it won't wake the machine or catch up on
+missed days. If that ever matters, `StartCalendarInterval` can be swapped
+for a `RunAtLoad`-on-wake approach, but that's not set up by default.
+
+## Known limitation
+
+`majorsBehind` is a regex-based heuristic (grabs the first number out of a
+version range/latest version), not full semver comparison. It's a signal to
+look closer, not a guarantee.
