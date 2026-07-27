@@ -256,9 +256,10 @@ cd DepsCheck
 ```
 
 `setup.sh` fills in this clone's actual location wherever an absolute path
-is needed (the slash command and the launchd plist both need one — see
+is needed (the slash command / skill and the launchd plist both need one — see
 [Limitations](#limitations) for why that can't be avoided entirely) and
-installs the slash command to `~/.claude/commands/dcheck.md`. It writes the
+installs the command/skill to `~/.claude/commands/dcheck.md` (for Claude Code)
+and `~/.gemini/config/skills/dcheck/SKILL.md` (for Antigravity). It writes the
 launchd plist to `~/Library/LaunchAgents/` but does **not** load it — that's
 a separate, explicit step:
 

@@ -8,11 +8,16 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 
 DEPSCHECK_HOME="$(pwd)"
 CLAUDE_COMMANDS_DIR="$HOME/.claude/commands"
+ANTIGRAVITY_SKILLS_DIR="$HOME/.gemini/config/skills/dcheck"
 LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
 
 mkdir -p "$CLAUDE_COMMANDS_DIR"
 sed "s|__DEPSCHECK_HOME__|$DEPSCHECK_HOME|g" commands/dcheck.md > "$CLAUDE_COMMANDS_DIR/dcheck.md"
-echo "Installed /dcheck -> $CLAUDE_COMMANDS_DIR/dcheck.md"
+echo "Installed Claude command /dcheck -> $CLAUDE_COMMANDS_DIR/dcheck.md"
+
+mkdir -p "$ANTIGRAVITY_SKILLS_DIR"
+sed "s|__DEPSCHECK_HOME__|$DEPSCHECK_HOME|g" skills/dcheck/SKILL.md > "$ANTIGRAVITY_SKILLS_DIR/SKILL.md"
+echo "Installed Antigravity skill /dcheck -> $ANTIGRAVITY_SKILLS_DIR/SKILL.md"
 
 mkdir -p "$LAUNCH_AGENTS_DIR"
 sed -e "s|__DEPSCHECK_HOME__|$DEPSCHECK_HOME|g" -e "s|__HOME__|$HOME|g" \
@@ -22,3 +27,4 @@ echo "Wrote $LAUNCH_AGENTS_DIR/com.depscheck.nightly.plist (not loaded yet)"
 echo ""
 echo "To enable the nightly job:"
 echo "  launchctl load \"$LAUNCH_AGENTS_DIR/com.depscheck.nightly.plist\""
+

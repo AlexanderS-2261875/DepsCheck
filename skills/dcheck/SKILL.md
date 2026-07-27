@@ -7,7 +7,7 @@ DepsCheck lives at `__DEPSCHECK_HOME__`
 (its own git repo — don't touch it beyond what's below).
 
 1. Run:
-   ```
+   ```bash
    node "__DEPSCHECK_HOME__/scripts/check-project.ts" "$(pwd)"
    ```
    This finds the nearest `package.json` from the current directory upward,
