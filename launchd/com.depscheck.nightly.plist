@@ -3,10 +3,11 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.schmittsoftware.depscheck</string>
+  <string>com.depscheck.nightly</string>
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
+    <!-- Replace with the absolute path to this repo's scripts/nightly.sh -->
     <string>__DEPSCHECK_HOME__/scripts/nightly.sh</string>
   </array>
   <key>StartCalendarInterval</key>
@@ -18,6 +19,7 @@
   </dict>
   <key>RunAtLoad</key>
   <false/>
+  <!-- Replace with your home directory (log output lands under ~/.claude/depscheck/) -->
   <key>StandardOutPath</key>
   <string>__HOME__/.claude/depscheck/launchd.out.log</string>
   <key>StandardErrorPath</key>
