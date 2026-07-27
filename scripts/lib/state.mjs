@@ -10,12 +10,13 @@ export const STATE_FILE = path.join(STATE_DIR, 'state.json');
 
 export function loadState() {
   if (!existsSync(STATE_FILE)) {
-    return { packages: {} };
+    return { packages: {}, projects: {} };
   }
   try {
-    return JSON.parse(readFileSync(STATE_FILE, 'utf8'));
+    const parsed = JSON.parse(readFileSync(STATE_FILE, 'utf8'));
+    return { packages: parsed.packages ?? {}, projects: parsed.projects ?? {} };
   } catch {
-    return { packages: {} };
+    return { packages: {}, projects: {} };
   }
 }
 

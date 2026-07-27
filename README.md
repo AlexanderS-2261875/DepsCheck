@@ -35,10 +35,32 @@ So the watchlist grows organically as you `/dcheck` different projects over
 time, and every project you've ever checked gets its dependencies re-verified
 every night, whether you open that project again or not.
 
+### Pruning removed/replaced dependencies
+
+The cache also tracks, per project, which package.json it last saw
+(`state.projects[pkgPath].lastSeenDeps`). Every check — interactive
+`/dcheck` or the nightly re-scan — diffs the current dependency set against
+that snapshot:
+
+- a dependency that disappeared from a project gets that project detached
+  from its `seenInProjects` list; once a package has zero referencing
+  projects left, it flips to `watched: false` and stops being nightly-checked
+  (its last-known data is kept, not deleted, in case it comes back)
+- a project whose path no longer exists on disk (folder deleted/moved) gets
+  detached entirely, same effect
+- this happens automatically during the nightly job too, not just when you
+  manually re-run `/dcheck` — so migrating off a package (e.g.
+  `react-router-dom` → `react-router`) gets picked up within one nightly
+  cycle even if you never open that project again
+
 ## Files
 
 - `scripts/check-project.mjs` — the `/dcheck` engine.
-- `scripts/refresh-registry.mjs` — nightly step 1 (registry refresh).
+- `scripts/refresh-registry.mjs` — nightly step 1: re-diffs every known
+  project (pruning removed deps / dead projects), then refreshes registry
+  data for everything still watched.
+- `scripts/lib/project.mjs` — shared dependency-diffing/pruning logic used
+  by both of the above.
 - `scripts/list-needs-research.mjs` — nightly step 2 helper (what to research).
 - `scripts/set-research.mjs` — safely merges one package's research into the cache.
 - `scripts/nightly.sh` — orchestrates the above, entry point for launchd.

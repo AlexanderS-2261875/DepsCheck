@@ -1,13 +1,40 @@
 #!/usr/bin/env node
-// Nightly step 1 (cheap, no AI): refresh registry data for every watched
-// package. If a package's deprecated/latest facts changed since last check,
-// any existing AI research on it is treated as stale and re-queued. Prints
-// the current needs-research queue so the caller can decide whether to
-// bother invoking Claude at all tonight.
+// Nightly step 1 (cheap, no AI):
+//   a) re-diff every known project still on disk against its package.json,
+//      so packages removed/replaced since the last check drop off the
+//      watchlist (or get pruned entirely if this was their only referrer);
+//      projects whose path no longer exists get detached outright.
+//   b) refresh registry data (latest version, deprecated flag) for
+//      everything still actually watched.
+// If a package's facts changed since last check, any existing AI research
+// on it is treated as stale and re-queued. Prints the current
+// needs-research queue so the caller can decide whether to bother invoking
+// Claude at all tonight.
+import { existsSync, readFileSync } from 'node:fs';
 import { loadState, saveState } from './lib/state.mjs';
 import { fetchRegistryInfo, mapWithConcurrency } from './lib/registry.mjs';
+import { syncProjectDeps, pruneMissingProject } from './lib/project.mjs';
 
 const state = loadState();
+
+const projectPaths = Object.keys(state.projects);
+const prunedProjects = [];
+for (const pkgPath of projectPaths) {
+  if (!existsSync(pkgPath)) {
+    prunedProjects.push(pkgPath);
+    pruneMissingProject(state, pkgPath);
+    continue;
+  }
+  let pkg;
+  try {
+    pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+  } catch {
+    continue;
+  }
+  const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+  await syncProjectDeps(state, pkgPath, deps);
+}
+
 const names = Object.keys(state.packages).filter((n) => state.packages[n].watched);
 
 await mapWithConcurrency(names, 8, async (name) => {
@@ -33,4 +60,9 @@ await mapWithConcurrency(names, 8, async (name) => {
 saveState(state);
 
 const needsResearch = names.filter((n) => state.packages[n].needsResearch);
-process.stdout.write(JSON.stringify({ checked: names.length, needsResearch }, null, 2) + '\n');
+process.stdout.write(JSON.stringify({
+  checkedProjects: projectPaths.length - prunedProjects.length,
+  prunedProjects,
+  checkedPackages: names.length,
+  needsResearch,
+}, null, 2) + '\n');

@@ -1,13 +1,14 @@
 #!/usr/bin/env node
-// Reads package.json for <targetDir> (or its nearest parent), diffs its
-// dependencies against the local cache, adds any never-seen-before package
-// to the watchlist with a one-off baseline registry check, and prints a
-// report. Packages already in the cache are reported straight from there —
-// no network call, no AI call. Run via the /dcheck slash command.
+// Reads package.json for <targetDir> (or its nearest parent), syncs its
+// dependency set against the local cache (adding new packages, detaching
+// ones that were removed/replaced since last check), and prints a report.
+// Packages already in the cache with research on file are reported straight
+// from there — no network call, no AI call. Run via the /dcheck slash command.
 import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { loadState, saveState } from './lib/state.mjs';
-import { fetchRegistryInfo, extractMajor } from './lib/registry.mjs';
+import { extractMajor } from './lib/registry.mjs';
+import { syncProjectDeps } from './lib/project.mjs';
 
 function findPackageJson(startDir) {
   let dir = path.resolve(startDir);
@@ -30,33 +31,14 @@ if (!pkgPath) {
 
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
 const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
-const depNames = Object.keys(deps);
 
 const state = loadState();
+const { removed, newlyAdded } = await syncProjectDeps(state, pkgPath, deps);
+
 const results = [];
-let newlyAdded = 0;
-
-for (const name of depNames) {
+for (const name of Object.keys(deps)) {
   const range = deps[name];
-  let entry = state.packages[name];
-
-  if (!entry) {
-    const registry = await fetchRegistryInfo(name);
-    entry = {
-      watched: true,
-      latest: registry?.latest ?? null,
-      deprecated: registry?.deprecated ?? null,
-      lastCheckedRegistry: new Date().toISOString(),
-      aiSummary: null,
-      suggestedAction: null,
-      researchedAt: null,
-      needsResearch: false,
-    };
-    state.packages[name] = entry;
-    newlyAdded++;
-  } else {
-    entry.watched = true;
-  }
+  const entry = state.packages[name];
 
   const currentMajor = extractMajor(range);
   const latestMajor = extractMajor(entry.latest);
@@ -87,5 +69,6 @@ process.stdout.write(JSON.stringify({
   project: path.basename(path.dirname(pkgPath)),
   packageJson: pkgPath,
   newlyAdded,
+  removed,
   results,
 }, null, 2) + '\n');
