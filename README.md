@@ -30,6 +30,7 @@ Up to date: 16 packages
 - [How it works](#how-it-works)
   - [Architecture at a glance](#architecture-at-a-glance)
   - [Running a check](#running-a-check-dcheck)
+  - [Planning and implementing an upgrade](#planning-and-implementing-an-upgrade-dupgrade)
   - [The nightly job](#the-nightly-job)
   - [Package lifecycle](#package-lifecycle)
   - [The cache, concretely](#the-cache-concretely)
@@ -134,6 +135,50 @@ The only case that touches the network is a package DepsCheck has never
 seen anywhere before, and even then it's a single unauthenticated GET to
 the public npm registry — no AI involved yet. That's what keeps `/dcheck`
 feeling instant for anything you've checked before.
+
+### Planning and implementing an upgrade (`/dupgrade`)
+
+`/dcheck` only ever reports. `/dupgrade` is the read-write counterpart —
+deliberately a separate command rather than a flag on `/dcheck`, so the
+line between "just tell me" and "go change things" is visible in what you
+type, not buried in an argument.
+
+```mermaid
+flowchart TD
+    Start(["/dupgrade"]) --> Gather["Read cached findings —<br/>flagged AND already researched only"]
+    Gather --> Draft["Draft a plan: replacement vs.<br/>version bump, ordered safest-first"]
+    Draft --> Review{"You: approve,<br/>revise, or ask?"}
+    Review -- revise --> Draft
+    Review -- approve --> Clean{"git status clean<br/>in the target project?"}
+    Clean -- no --> Stop(["Stop — say so,<br/>don't touch files"])
+    Clean -- yes --> Implement["Work the plan in order:<br/>edit package.json / imports,<br/>install, run any named codemod"]
+    Implement --> Verify{"Build / typecheck / lint<br/>still pass?"}
+    Verify -- no --> Pause["Stop on this package,<br/>show the real error,<br/>ask: debug further or revert?"]
+    Verify -- yes --> Next["Move to next package in plan"]
+    Next --> Implement
+    Pause --> Report
+    Next --> Report["Report per-package outcome.<br/>Nothing committed or pushed —<br/>that stays your call"]
+```
+
+A few things worth being explicit about:
+
+- **Only researched findings get planned.** Anything still
+  `pendingResearch: true` gets left out with a note, not guessed at.
+- **Two different kinds of change, not one generic "upgrade."** A
+  deprecated package (e.g. `request`) gets *replaced* — dependency swap,
+  every import site updated — because bumping its version doesn't undo the
+  deprecation. A merely-behind package gets a version *bump*, plus whatever
+  codemod the research named.
+- **The plan is a real checkpoint, not a formality.** Implementation only
+  starts once you've explicitly approved — the same instruction set works
+  whether "approve" happens through Claude Code's own plan-mode UI or just
+  as a plain reply in chat, since the underlying command/skill file doesn't
+  assume either.
+- **It stops on the first broken build**, not after grinding through every
+  package regardless of what it left behind — a failed verification pauses
+  that one package for a decision, rather than silently pushing on.
+- **It never commits or pushes.** Implementation ends with uncommitted
+  changes in your working tree and a summary — review and commit is yours.
 
 ### The nightly job
 
@@ -256,10 +301,10 @@ cd DepsCheck
 ```
 
 `setup.sh` fills in this clone's actual location wherever an absolute path
-is needed (the slash command / skill and the launchd plist both need one — see
+is needed (the commands/skills and the launchd plist all need one — see
 [Limitations](#limitations) for why that can't be avoided entirely) and
-installs the command/skill to `~/.claude/commands/dcheck.md` (for Claude Code)
-and `~/.gemini/config/skills/dcheck/SKILL.md` (for Antigravity). It writes the
+installs both `/dcheck` and `/dupgrade` to `~/.claude/commands/` (for Claude
+Code) and `~/.gemini/config/skills/` (for Antigravity). It writes the
 launchd plist to `~/Library/LaunchAgents/` but does **not** load it — that's
 a separate, explicit step:
 
@@ -283,11 +328,15 @@ tail -f ~/.claude/depscheck/nightly.log
 
 ```bash
 # from inside any project with a package.json
-/dcheck
+/dcheck      # read-only status report
+/dupgrade    # draft an upgrade plan, then implement it once you approve
 ```
 
-That's the only interface. There's no separate "add project" step — the
-first `/dcheck` you run in a project is what adds it.
+There's no separate "add project" step — the first `/dcheck` you run in a
+project is what adds it. `/dupgrade` reads the same cache `/dcheck` does; it
+doesn't require having run `/dcheck` first in the same session, but there's
+nothing to plan around until something has actually been researched (either
+by a prior `/dcheck` run seeding the watchlist, or by the nightly job).
 
 Everything else is scriptable directly, if you want to drive it outside of
 Claude Code:

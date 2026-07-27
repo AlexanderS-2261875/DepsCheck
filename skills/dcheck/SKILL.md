@@ -35,5 +35,9 @@ DepsCheck lives at `__DEPSCHECK_HOME__`
    means DepsCheck noticed the project stopped depending on them since the
    last check.
 
+5. If at least one flagged item has cached research (`aiSummary` non-null),
+   mention that `/dupgrade` can draft an upgrade plan for it — don't launch
+   into that here, just point it out.
+
 Don't run `npm install`, don't modify the project's `package.json` — this is
 read-only reporting.
