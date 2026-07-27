@@ -83,7 +83,7 @@ flowchart TD
     Claude["Claude Code, headless<br/>+ WebSearch"]
 
     ProjA -.->|you run this here| CLI
-    CLI <-->|read / write| Cache
+    CLI -->|read / write| Cache
     CLI -->|new package? one-off lookup| Registry
 
     Nightly -->|re-diff every known project| ProjA
@@ -92,7 +92,7 @@ flowchart TD
     Nightly -->|refresh latest + deprecated| Registry
     Nightly -->|flagged & unresearched?| Claude
     Claude -->|findings| Cache
-    Nightly <--> Cache
+    Nightly -->|read / write| Cache
 ```
 
 Two independent paths share one cache: the interactive path (you, typing
