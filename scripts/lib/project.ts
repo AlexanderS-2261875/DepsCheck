@@ -3,6 +3,7 @@
 // replaced in a project eventually drop off the nightly watchlist instead
 // of lingering forever.
 import { fetchRegistryInfo } from './registry.ts';
+import type { RegistryDep } from './deps.ts';
 import type { State } from './state.ts';
 
 export interface SyncResult {
@@ -10,12 +11,15 @@ export interface SyncResult {
   newlyAdded: number;
 }
 
+// `deps` is the registry-resolvable subset only (see lib/deps.ts). Everything
+// tracked here is keyed by registry name, so an `npm:` alias is recorded under
+// the package it actually resolves to rather than the local name it's given.
 export async function syncProjectDeps(
   state: State,
   pkgPath: string,
-  deps: Record<string, string>,
+  deps: RegistryDep[],
 ): Promise<SyncResult> {
-  const currentNames = Object.keys(deps);
+  const currentNames = [...new Set(deps.map((d) => d.registryName))];
   const prevEntry = state.projects[pkgPath];
   const prevNames = prevEntry?.lastSeenDeps ?? [];
 
@@ -36,8 +40,9 @@ export async function syncProjectDeps(
       const registry = await fetchRegistryInfo(name);
       entry = {
         watched: true,
-        latest: registry?.latest ?? null,
-        deprecated: registry?.deprecated ?? null,
+        latest: registry.ok ? registry.latest : null,
+        deprecated: registry.ok ? registry.deprecated : null,
+        registryError: registry.ok ? null : registry.error,
         lastCheckedRegistry: new Date().toISOString(),
         aiSummary: null,
         suggestedAction: null,

@@ -14,6 +14,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { loadState, saveState } from './lib/state.ts';
 import { fetchRegistryInfo, mapWithConcurrency } from './lib/registry.ts';
 import { syncProjectDeps, pruneMissingProject } from './lib/project.ts';
+import { classifyDeps, collectDeps } from './lib/deps.ts';
 
 const state = loadState();
 
@@ -31,8 +32,7 @@ for (const pkgPath of projectPaths) {
   } catch {
     continue;
   }
-  const deps: Record<string, string> = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
-  await syncProjectDeps(state, pkgPath, deps);
+  await syncProjectDeps(state, pkgPath, classifyDeps(collectDeps(pkg)).registry);
 }
 
 const names = Object.keys(state.packages).filter((n) => state.packages[n].watched);
@@ -40,10 +40,16 @@ const names = Object.keys(state.packages).filter((n) => state.packages[n].watche
 await mapWithConcurrency(names, 8, async (name) => {
   const entry = state.packages[name];
   const registry = await fetchRegistryInfo(name);
-  if (!registry) return;
+  if (!registry.ok) {
+    // Record why and keep the last known good data — a transient outage
+    // shouldn't erase what we already knew about the package.
+    entry.registryError = registry.error;
+    return;
+  }
+  entry.registryError = null;
 
   const changed = registry.latest !== entry.latest || registry.deprecated !== entry.deprecated;
-  entry.latest = registry.latest ?? null;
+  entry.latest = registry.latest;
   entry.deprecated = registry.deprecated;
   entry.lastCheckedRegistry = new Date().toISOString();
 
@@ -64,5 +70,6 @@ process.stdout.write(JSON.stringify({
   checkedProjects: projectPaths.length - prunedProjects.length,
   prunedProjects,
   checkedPackages: names.length,
+  unresolved: names.filter((n) => state.packages[n].registryError),
   needsResearch,
 }, null, 2) + '\n');
