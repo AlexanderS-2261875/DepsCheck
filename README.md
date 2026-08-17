@@ -24,12 +24,16 @@ Up to date: 16 packages
 
 - `/dcheck` reads a local cache (`~/.claude/depscheck/state.json`). No network
   call unless it sees a package for the first time — then it's one GET to the
-  npm registry.
+  npm registry. Writes are atomic, and the last good cache is kept alongside it
+  as `state.json.bak`.
 - A nightly job re-checks every known project, refreshes registry data, and
   runs Claude with WebSearch on anything newly flagged. Research happens once,
   in the background, not while you wait.
 - Packages enter the system the first time you run `/dcheck` in a project that
   uses them. Drop a dependency and the nightly job stops watching it.
+- Only registry deps are checked. `file:`, `link:`, `workspace:`, git and URL
+  deps are listed as skipped — the registry would answer about an unrelated
+  package of the same name. `npm:` aliases resolve to what they point at.
 - `/dupgrade` only plans packages that have actually been researched. It stops
   on the first broken build and never commits or pushes.
 
@@ -101,10 +105,12 @@ npm run typecheck
 npm test
 ```
 
-Both tests run against `test/fixtures/sample-project` with
-`DEPSCHECK_STATE_DIR` pointed at a temp dir, so they can't touch your real
-cache. `smoke-test.sh` checks that a deprecated package gets flagged;
-`prune-test.sh` checks that a removed dependency gets unwatched.
+All four tests point `DEPSCHECK_STATE_DIR` at a temp dir, so they can't touch
+your real cache. `smoke-test.sh` checks that a deprecated package gets flagged;
+`prune-test.sh` checks that a removed dependency gets unwatched;
+`state-test.sh` checks that an unreadable cache is recovered from the backup —
+or refuses to run — rather than silently starting over; `deps-test.sh` checks
+that non-registry deps are skipped and unresolvable ones aren't called fine.
 
 CI runs the same commands on every push and PR — run them before opening a PR.
 

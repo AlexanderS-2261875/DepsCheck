@@ -13,7 +13,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "bash test/smoke-test.sh && bash test/prune-test.sh"
+    "test": "bash test/smoke-test.sh && bash test/prune-test.sh && bash test/state-test.sh && bash test/deps-test.sh"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",
